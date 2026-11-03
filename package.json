@@ -1,0 +1,14 @@
+{
+  "name": "osu-collections",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/serve.mjs",
+    "publish": "node scripts/publish.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "adm-zip": "0.6.1"
+  }
+}

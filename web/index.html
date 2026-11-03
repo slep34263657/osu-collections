@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1c1c1e">
+  <meta name="description" content="Browse osu! beatmap collections. Download individual maps, collection packs, or open maps in osu!direct.">
+  <title>osu! collections</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <a class="brand" href="#">osu! collections</a>
+      <nav id="collections" aria-label="Collections"></nav>
+    </aside>
+    <main>
+      <section class="intro"><h1 id="title">All maps</h1><p id="description" hidden></p><div id="collection-actions" class="actions"></div></section>
+      <section class="library" aria-label="Beatmaps">
+        <div class="toolbar"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search title, artist or mapper…" aria-label="Search maps"></label><label class="sort-label"><span>Sort</span><select id="sort" aria-label="Sort maps"><option value="title">Title A–Z</option><option value="artist">Artist A–Z</option></select></label></div>
+        <div class="list-heading"><span>BEATMAP</span><span id="count" aria-live="polite"></span></div>
+        <div id="maps" aria-live="polite"><div class="empty"><h2>Loading library…</h2></div></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
