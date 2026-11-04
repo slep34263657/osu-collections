@@ -52,7 +52,7 @@ function difficultyTable(stats, slim = false) {
     const bpm = Number.isFinite(diff.bpmMin) ? `${Math.round(diff.bpmMin)}${Math.round(diff.bpmMax) !== Math.round(diff.bpmMin) ? `–${Math.round(diff.bpmMax)}` : ''}` : '—';
     for (const value of [
       diff.stars ? `${diff.stars.toFixed(2)} ★` : '—',
-      Number.isFinite(diff.pp) ? Math.round(diff.pp) : '—',
+      Number.isFinite(diff.pp) ? `${Math.round(diff.pp)} pp` : '—',
       diff.mode === 1 || diff.mode === 3 ? '—' : stat(diff.ar), stat(diff.od), diff.mode === 3 ? `${stat(diff.cs)}K` : diff.mode === 1 ? '—' : stat(diff.cs),
       bpm, duration(diff.length)
     ]) row.append(element('td', '', value));
