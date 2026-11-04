@@ -8,6 +8,7 @@ import path from 'node:path';
 import AdmZip from 'adm-zip';
 import { parseOsdb } from './collections.mjs';
 import { build } from './build.mjs';
+import { writePacks } from './packs.mjs';
 
 const str = s => { const b = Buffer.from(s), prefix = []; let n = b.length; do { prefix.push((n & 127) | (n > 127 ? 128 : 0)); n >>>= 7; } while (n); return Buffer.concat([Buffer.from(prefix), b]); };
 const int = n => { const b = Buffer.alloc(4); b.writeInt32LE(n); return b; };
@@ -41,13 +42,25 @@ test('build matches OSZ hashes, deduplicates sets and packs original files', asy
     await fs.mkdir(path.join(root, 'maps')); await fs.mkdir(path.join(root, 'collections'));
     await fs.cp('web', path.join(root, 'web'), { recursive: true }); await fs.copyFile('site.config.json', path.join(root, 'site.config.json'));
     const osu = Buffer.from('osu file format v14\r\n[Metadata]\r\nTitle:Test title\r\nArtist:Test artist\r\nCreator:Mapper\r\nVersion:Hard\r\nBeatmapID:42\r\nBeatmapSetID:100\r\n');
-    const zip = new AdmZip(); zip.addFile('hard.osu', osu); zip.addFile('audio.mp3', Buffer.from('fixture'));
+    const zip = new AdmZip(); zip.addFile('hard.osu', osu); zip.addFile('audio.mp3', Buffer.from('fixture')); zip.addFile('video.MP4', Buffer.from('video fixture'));
     await fs.writeFile(path.join(root, 'maps', 'test.osz'), zip.toBuffer());
     await fs.writeFile(path.join(root, 'collections', 'test.osdb'), fixture('o!dm8', createHash('md5').update(osu).digest('hex')));
     const catalog = await build(root), c = catalog.collections[0];
     assert.equal(c.available, 1); assert.equal(c.missing, 1); assert.equal(c.maps[0].title, 'Test title'); assert.equal(c.maps[0].creator, 'Mapper');
     assert.match(c.maps[0].download, /https:\/\/github.com\/.+\.osz$/);
+    const hosted = new AdmZip(path.join(root, 'artifacts', c.maps[0].asset));
+    assert.equal(hosted.getEntry('video.MP4'), null); assert.deepEqual(hosted.getEntry('hard.osu').getData(), osu); assert.ok(hosted.getEntry('audio.mp3'));
     const pack = new AdmZip(path.join(root, 'artifacts', decodeURIComponent(c.pack.split('/').at(-1))));
     assert.equal(pack.getEntries().length, 2); assert.ok(pack.getEntries().some(e => e.entryName.endsWith('.osdb')));
   } finally { await fs.rm(root, { recursive: true, force: true }); }
+});
+test('splits collection packs without losing or repeating maps', async () => {
+  const artifacts = await fs.mkdtemp(path.join(os.tmpdir(), 'osu-packs-test-'));
+  try {
+    const maps = [{ asset: 'one.osz', bytes: 8 }, { asset: 'two.osz', bytes: 8 }];
+    for (const m of maps) await fs.writeFile(path.join(artifacts, m.asset), Buffer.alloc(m.bytes));
+    const assets = await writePacks(maps, { artifacts, id: 'test', sourceAsset: 'test.osdb', buffer: Buffer.from('test'), limit: 15 });
+    assert.equal(assets.length, 2);
+    assets.forEach((asset, i) => { const zip = new AdmZip(path.join(artifacts, asset)); assert.equal(zip.getEntries().length, 2); assert.ok(zip.getEntry(maps[i].asset)); });
+  } finally { await fs.rm(artifacts, { recursive: true, force: true }); }
 });

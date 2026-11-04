@@ -37,7 +37,8 @@ function route() {
   $('description').textContent = current ? `${current.available} hosted mapsets${current.missing ? ` · ${current.missing} unhosted entries` : ''}` : '';
   $('collection-actions').replaceChildren();
   if (current) {
-    if (current.pack) $('collection-actions').append(button('Download collection ZIP ↓', current.pack, true));
+    const packs = current.packs || (current.pack ? [current.pack] : []);
+    packs.forEach((url, i) => $('collection-actions').append(button(packs.length > 1 ? `Download ZIP ${i + 1} of ${packs.length} ↓` : 'Download collection ZIP ↓', url, true)));
     $('collection-actions').append(button('Collection file .osdb', current.collectionDownload));
   }
   for (const a of $('collections').children) { if (a.hash === location.hash || (!current && a.getAttribute('href') === '#')) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }

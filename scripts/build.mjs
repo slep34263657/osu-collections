@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { parseOsdb } from './collections.mjs';
+import { writePacks } from './packs.mjs';
 
 export async function build(root = process.cwd(), fromCatalog = false) {
   const config = JSON.parse(await fs.readFile(path.join(root, 'site.config.json'), 'utf8'));
@@ -18,7 +19,7 @@ export async function build(root = process.cwd(), fromCatalog = false) {
   const link = name => base + encodeURIComponent(name);
   const byHash = new Map(), bySet = new Map(), byId = new Map(), sets = [];
   for (const file of (await fs.readdir(path.join(root, 'maps'))).filter(f => /\.osz$/i.test(f)).sort()) {
-    const bytes = await fs.readFile(path.join(root, 'maps', file));
+    let bytes = await fs.readFile(path.join(root, 'maps', file));
     if (bytes.length >= 2 * 1024 ** 3) throw new Error(`${file}: GitHub release files must be under 2 GiB`);
     const zip = new AdmZip(bytes), diffs = [];
     for (const entry of zip.getEntries().filter(e => /\.osu$/i.test(e.entryName))) {
@@ -28,6 +29,9 @@ export async function build(root = process.cwd(), fromCatalog = false) {
       diffs.push({ hash: createHash('md5').update(data).digest('hex'), id: Number(field('BeatmapID')) || -1, setId: Number(field('BeatmapSetID')) || -1, artist: field('Artist'), title: field('Title'), creator: field('Creator'), difficulty: field('Version') });
     }
     if (!diffs.length) throw new Error(`${file}: no .osu difficulties found`);
+    const videos = zip.getEntries().filter(e => /\.(?:mp4|avi|flv|mov|mkv|webm|wmv|m4v|mpg|mpeg|ogv)$/i.test(e.entryName));
+    for (const entry of videos) zip.deleteFile(entry.entryName);
+    if (videos.length) { bytes = zip.toBuffer(); console.log(`Removed ${videos.length} video file(s): ${file}`); }
     const asset = `map-${createHash('sha256').update(bytes).digest('hex').slice(0, 20)}.osz`;
     await fs.writeFile(path.join(artifacts, asset), bytes);
     const set = { ...diffs[0], key: asset, asset, filename: file, bytes: bytes.length, download: link(asset), difficulties: diffs.map(d => d.difficulty) };
@@ -49,15 +53,8 @@ export async function build(root = process.cwd(), fromCatalog = false) {
         if (set) matched.set(set.key, set);
         else { const key = map.setId > 0 ? `set-${map.setId}` : map.hash || `id-${map.id}`; missing.set(key, { ...map, key, title: map.title || 'Unavailable map', difficulties: map.difficulty ? [map.difficulty] : [] }); }
       }
-      const archive = new AdmZip(); archive.addFile(sourceAsset, buffer);
-      for (const set of matched.values()) archive.addLocalFile(path.join(artifacts, set.asset), '', set.asset);
-      let pack = null;
-      if (matched.size) {
-        const asset = `pack-${id}.zip`, bytes = archive.toBuffer();
-        if (bytes.length >= 2 * 1024 ** 3) throw new Error(`${collection.name}: collection ZIP exceeds GitHub's 2 GiB limit; split the collection`);
-        await fs.writeFile(path.join(artifacts, asset), bytes); pack = link(asset);
-      }
-      collections.push({ id, name: collection.name, source: file, collectionDownload: link(sourceAsset), pack, available: matched.size, missing: missing.size, maps: [...matched.values(), ...missing.values()] });
+      const packs = (await writePacks([...matched.values()], { artifacts, id, sourceAsset, buffer })).map(link);
+      collections.push({ id, name: collection.name, source: file, collectionDownload: link(sourceAsset), pack: packs.length === 1 ? packs[0] : null, packs, available: matched.size, missing: missing.size, maps: [...matched.values(), ...missing.values()] });
     }
   }
   const catalog = { title: config.title, maps: sets, collections };
