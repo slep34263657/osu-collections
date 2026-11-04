@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { parseOsdb } from './collections.mjs';
+import { parseOsdb, renameCollection } from './collections.mjs';
 import { build } from './build.mjs';
 import { writePacks } from './packs.mjs';
 
@@ -36,6 +36,12 @@ test('rejects corrupt and truncated collection files', () => {
   assert.throws(() => parseOsdb(fixture('o!dm8').subarray(0, 20)));
   const b = fixture('o!dm6'); b[b.length - 1] = 0; assert.throws(() => parseOsdb(b), /footer/);
 });
+test('renames collections without changing map data', () => {
+  for (const version of ['o!dm', 'o!dm6', 'o!dm8', 'o!dm8min']) {
+    const original = fixture(version), renamed = parseOsdb(renameCollection(original, 'alt'));
+    assert.equal(renamed[0].name, 'alt'); assert.deepEqual(renamed[0].maps, parseOsdb(original)[0].maps);
+  }
+});
 test('build matches OSZ hashes, deduplicates sets and packs original files', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'osu-collections-test-'));
   try {
@@ -48,9 +54,9 @@ test('build matches OSZ hashes, deduplicates sets and packs original files', asy
     const catalog = await build(root), c = catalog.collections[0];
     assert.equal(c.available, 1); assert.equal(c.missing, 1); assert.equal(c.maps[0].title, 'Test title'); assert.equal(c.maps[0].creator, 'Mapper');
     assert.match(c.maps[0].download, /https:\/\/github.com\/.+\.osz$/);
-    const hosted = new AdmZip(path.join(root, 'artifacts', c.maps[0].asset));
+    const hosted = new AdmZip(path.join(root, 'artifacts/releases', c.maps[0].asset));
     assert.equal(hosted.getEntry('video.MP4'), null); assert.deepEqual(hosted.getEntry('hard.osu').getData(), osu); assert.ok(hosted.getEntry('audio.mp3'));
-    const pack = new AdmZip(path.join(root, 'artifacts', decodeURIComponent(c.pack.split('/').at(-1))));
+    const pack = new AdmZip(path.join(root, 'artifacts/releases', decodeURIComponent(c.pack.split('/').at(-1))));
     assert.equal(pack.getEntries().length, 2); assert.ok(pack.getEntries().some(e => e.entryName.endsWith('.osdb')));
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });

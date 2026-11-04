@@ -9,7 +9,7 @@ import { enrichAudio } from './audio.mjs';
 
 export async function build(root = process.cwd(), fromCatalog = false) {
   const config = JSON.parse(await fs.readFile(path.join(root, 'site.config.json'), 'utf8'));
-  const out = path.join(root, 'dist'), artifacts = path.join(root, 'artifacts');
+  const out = path.join(root, 'dist'), artifacts = path.join(root, 'artifacts/releases');
   await fs.mkdir(out, { recursive: true });
   if (fromCatalog) {
     await fs.cp(path.join(root, 'web'), out, { recursive: true });
@@ -41,8 +41,9 @@ export async function build(root = process.cwd(), fromCatalog = false) {
     const asset = `map-${createHash('sha256').update(bytes).digest('hex').slice(0, 20)}.osz`;
     await fs.writeFile(path.join(artifacts, asset), bytes);
     const set = { ...diffs[0], key: asset, asset, filename: file, bytes: bytes.length, download: link(asset), difficulties: diffs.map(d => d.difficulty) };
-    sets.push(set);
-    for (const d of diffs) { byHash.set(d.hash, set); if (d.id > 0) byId.set(d.id, set); if (d.setId > 0) bySet.set(d.setId, set); }
+    const existing = sets.find(map => map.key === asset);
+    if (!existing) sets.push(set);
+    for (const d of diffs) { byHash.set(d.hash, existing || set); if (d.id > 0) byId.set(d.id, existing || set); if (d.setId > 0) bySet.set(d.setId, existing || set); }
   }
   const collections = [];
   for (const file of (await fs.readdir(path.join(root, 'collections'))).filter(f => /\.osdb$/i.test(f)).sort()) {

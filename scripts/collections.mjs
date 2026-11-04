@@ -1,4 +1,4 @@
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 class Reader {
   constructor(buffer) { this.buffer = buffer; this.offset = 0; }
@@ -47,4 +47,18 @@ export function parseOsdb(buffer) {
   }
   if (r.string() !== 'By Piotrekol' || r.offset !== r.buffer.length) throw new Error('Invalid OSDB footer');
   return collections;
+}
+
+export function renameCollection(buffer, name) {
+  if (parseOsdb(buffer).length !== 1) throw new Error('Expected one collection to rename');
+  let r = new Reader(buffer); const version = r.string();
+  const compressed = Number(version.match(/\d+/)?.[0] || 1) >= 7;
+  const prefix = buffer.subarray(0, r.offset);
+  if (compressed) { r = new Reader(gunzipSync(buffer.subarray(r.offset))); r.string(); }
+  r.take(8); r.string(); r.count();
+  const start = r.offset; r.string();
+  const text = Buffer.from(name, 'utf8'), length = []; let n = text.length;
+  do { length.push((n & 127) | (n > 127 ? 128 : 0)); n >>>= 7; } while (n);
+  const renamed = Buffer.concat([r.buffer.subarray(0, start), Buffer.from(length), text, r.buffer.subarray(r.offset)]);
+  return compressed ? Buffer.concat([prefix, gzipSync(renamed)]) : renamed;
 }
