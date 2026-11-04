@@ -15,10 +15,10 @@
       <nav id="collections" aria-label="Collections"></nav>
     </aside>
     <main>
-      <section class="intro"><h1 id="title">All maps</h1><p id="description" hidden></p><div id="collection-actions" class="actions"></div></section>
+      <section class="intro"><h1 id="title">All maps</h1><p id="description" hidden></p><div id="collection-actions" class="actions"></div><p id="split-note" class="split-note" hidden></p></section>
       <section class="library" aria-label="Beatmaps">
-        <div class="toolbar"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search title, artist or mapper…" aria-label="Search maps"></label><label class="sort-label"><span>Sort</span><select id="sort" aria-label="Sort maps"><option value="title">Title A–Z</option><option value="artist">Artist A–Z</option></select></label></div>
-        <div class="list-heading"><span>BEATMAP</span><span id="count" aria-live="polite"></span></div>
+        <div class="toolbar"><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search or filter: stars>5 ar>=9" aria-describedby="search-error" aria-label="Search maps"></label><div class="toolbar-actions"><button id="slim-toggle" class="button mod-toggle" type="button" aria-pressed="false" aria-label="Show slim view">Slim</button><button id="dt-toggle" class="button mod-toggle" type="button" aria-pressed="false" aria-label="Show Double Time stats" title="Double Time stats (1.5×)">DT</button><div class="sort-controls"><select id="sort" aria-label="Sort by"><option value="stars">Stars</option><option value="ar">AR</option><option value="bpmMax">BPM</option></select><button id="sort-direction" class="sort-direction" type="button" aria-label="Sort low to high" title="Sort low to high"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m-5-5 5 5 5-5"/></svg></button></div></div></div>
+        <p id="search-error" class="search-error" role="status" hidden></p><div class="list-heading"><span>BEATMAP</span><span id="count" aria-live="polite"></span></div>
         <div id="maps" aria-live="polite"><div class="empty"><h2>Loading library…</h2></div></div>
       </section>
     </main>

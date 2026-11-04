@@ -35,8 +35,11 @@ export function parseOsdb(buffer) {
       if (!minimal) { map.artist = r.string(); map.title = r.string(); map.difficulty = r.string(); }
       map.hash = r.string().toLowerCase();
       if (v >= 4) r.string();
-      if (v >= 8 || (v >= 5 && !minimal)) r.byte();
-      if (v >= 8 || (v >= 6 && !minimal)) r.take(8);
+      if (v >= 8 || (v >= 5 && !minimal)) map.mode = r.byte();
+      if (v >= 8 || (v >= 6 && !minimal)) {
+        const stars = r.take(8).readDoubleLE();
+        if (Number.isFinite(stars) && stars > 0) map.stars = stars;
+      }
       maps.push(map);
     }
     if (v >= 3) { const n = r.count(); for (let j = 0; j < n; j++) maps.push({ hash: r.string().toLowerCase() }); }

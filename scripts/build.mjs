@@ -4,17 +4,23 @@ import { createHash } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { parseOsdb } from './collections.mjs';
 import { writePacks } from './packs.mjs';
+import { enrichCatalog } from './metadata.mjs';
+import { enrichAudio } from './audio.mjs';
 
 export async function build(root = process.cwd(), fromCatalog = false) {
   const config = JSON.parse(await fs.readFile(path.join(root, 'site.config.json'), 'utf8'));
   const out = path.join(root, 'dist'), artifacts = path.join(root, 'artifacts');
-  await fs.mkdir(out, { recursive: true }); await fs.mkdir(artifacts, { recursive: true });
-  await fs.rm(out, { recursive: true, force: true }); await fs.rm(artifacts, { recursive: true, force: true });
-  await fs.cp(path.join(root, 'web'), out, { recursive: true }); await fs.mkdir(artifacts);
+  await fs.mkdir(out, { recursive: true });
   if (fromCatalog) {
+    await fs.cp(path.join(root, 'web'), out, { recursive: true });
     await fs.copyFile(path.join(root, 'data/catalog.json'), path.join(out, 'catalog.json'));
+    try { await fs.cp(path.join(root, 'data/covers'), path.join(out, 'covers'), { recursive: true }); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { await fs.cp(path.join(root, 'data/previews'), path.join(out, 'previews'), { recursive: true }); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     console.log('Built site from published catalog'); return;
   }
+  await fs.mkdir(artifacts, { recursive: true });
+  await fs.rm(out, { recursive: true, force: true }); await fs.rm(artifacts, { recursive: true, force: true });
+  await fs.cp(path.join(root, 'web'), out, { recursive: true }); await fs.mkdir(artifacts);
   const base = `https://github.com/${config.downloadRepository}/releases/download/${encodeURIComponent(config.releaseTag)}/`;
   const link = name => base + encodeURIComponent(name);
   const byHash = new Map(), bySet = new Map(), byId = new Map(), sets = [];
@@ -53,11 +59,17 @@ export async function build(root = process.cwd(), fromCatalog = false) {
         if (set) matched.set(set.key, set);
         else { const key = map.setId > 0 ? `set-${map.setId}` : map.hash || `id-${map.id}`; missing.set(key, { ...map, key, title: map.title || 'Unavailable map', difficulties: map.difficulty ? [map.difficulty] : [] }); }
       }
-      const packs = (await writePacks([...matched.values()], { artifacts, id, sourceAsset, buffer })).map(link);
-      collections.push({ id, name: collection.name, source: file, collectionDownload: link(sourceAsset), pack: packs.length === 1 ? packs[0] : null, packs, available: matched.size, missing: missing.size, maps: [...matched.values(), ...missing.values()] });
+      const assets = await writePacks([...matched.values()], { artifacts, id, sourceAsset, buffer });
+      const packSizes = await Promise.all(assets.map(async asset => (await fs.stat(path.join(artifacts, asset))).size));
+      const packs = assets.map(link);
+      collections.push({ id, name: collection.name, source: file, collectionDownload: link(sourceAsset), pack: packs.length === 1 ? packs[0] : null, packs, packSizes, available: matched.size, missing: missing.size, maps: [...matched.values(), ...missing.values()] });
     }
   }
   const catalog = { title: config.title, maps: sets, collections };
+  await enrichCatalog(root, catalog);
+  await enrichAudio(root, catalog);
+  await fs.cp(path.join(root, 'data/covers'), path.join(out, 'covers'), { recursive: true });
+  await fs.cp(path.join(root, 'data/previews'), path.join(out, 'previews'), { recursive: true });
   await fs.writeFile(path.join(out, 'catalog.json'), JSON.stringify(catalog));
   await fs.mkdir(path.join(root, 'data'), { recursive: true });
   await fs.writeFile(path.join(root, 'data/catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
