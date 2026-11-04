@@ -1,5 +1,8 @@
 import { previewButton, stopPreview } from './preview.js';
 import { parseSearch } from './search.js';
+import { collectionRoutes } from './routes.js';
+const appRoot = new URL('.', import.meta.url);
+document.querySelector('base').href = appRoot.href;
 const $ = id => document.getElementById(id);
 const element = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
 const button = (text, href, primary = false) => {
@@ -66,7 +69,8 @@ function difficultyTable(stats, slim = false) {
   }
   table.append(body); scroll.append(table); return scroll;
 }
-let catalog, current, sortDirection = 'desc', dtEnabled = false, slimEnabled = false;
+let catalog, current, paths, sortDirection = 'desc', dtEnabled = false, slimEnabled = false;
+const collectionPath = collection => `${appRoot.pathname}${collection ? paths.get(collection.id) : ''}`;
 const mapStats = map => map.visibleStats || (map.difficultyStats || []).map(diff => dtEnabled ? { ...diff, ...diff.dt } : diff);
 function updateSortDirection() {
   const action = sortDirection === 'asc' ? 'Sort high to low' : 'Sort low to high';
@@ -166,7 +170,10 @@ function renderMaps() {
   });
 }
 function route() {
-  current = catalog.collections.find(c => `#${c.id}` === location.hash);
+  const pathname = location.pathname.replace(/\/$/, '');
+  current = catalog.collections.find(c => `#${c.id}` === location.hash) || catalog.collections.find(c => collectionPath(c) === pathname);
+  const canonical = collectionPath(current);
+  if (current && (location.pathname !== canonical || location.hash)) history.replaceState(null, '', canonical + location.search);
   $('title').textContent = current?.name || 'All maps';
   $('description').hidden = !current;
   $('description').textContent = current ? `${current.available} hosted mapsets${current.missing ? ` · ${current.missing} unhosted entries` : ''}` : '';
@@ -198,14 +205,16 @@ function route() {
       $('split-note').hidden = false;
     }
   }
-  for (const a of $('collections').children) { if (a.hash === location.hash || (!current && a.getAttribute('href') === '#')) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  for (const a of $('collections').children) { if (a.dataset.collection === (current?.id || '')) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
   renderMaps();
 }
 try {
-  const response = await fetch('catalog.json'); if (!response.ok) throw new Error('Catalog request failed'); catalog = await response.json();
+  const response = await fetch(new URL('catalog.json', appRoot)); if (!response.ok) throw new Error('Catalog request failed'); catalog = await response.json();
+  paths = collectionRoutes(catalog.collections);
+  document.querySelector('.brand').href = appRoot.href;
   document.title = catalog.title; $('collections').replaceChildren();
   for (const c of [{ id: '', name: 'All maps', maps: catalog.maps }, ...catalog.collections]) {
-    const a = element('a'); a.href = `#${c.id}`;
+    const a = element('a'); a.href = collectionPath(c.id ? c : null); a.dataset.collection = c.id;
     a.append(element('span', '', c.name), element('span', 'badge', c.maps.length)); $('collections').append(a);
   }
   $('search').addEventListener('input', renderMaps);
@@ -226,7 +235,12 @@ try {
     $('slim-toggle').setAttribute('aria-label', slimEnabled ? 'Show normal view' : 'Show slim view');
     renderMaps();
   });
-  updateSortDirection(); window.addEventListener('hashchange', route); route();
+  for (const container of [$('collections'), document.querySelector('.brand')]) container.addEventListener('click', event => {
+    const link = event.target.closest('a');
+    if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); history.pushState(null, '', link.href); route(); window.scrollTo(0, 0);
+  });
+  updateSortDirection(); window.addEventListener('hashchange', route); window.addEventListener('popstate', route); route();
 } catch (error) {
   const box = element('div', 'empty'); box.append(element('h2', 'error', 'Couldn’t load the library'), element('p', '', 'Refresh the page to try again.')); $('maps').replaceChildren(box); console.error(error);
 }
